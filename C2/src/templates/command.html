@@ -1,0 +1,20 @@
+{% extends 'core.html' %}
+
+{% block body %}
+
+    {% if session.logged_in %}
+        <h2>Welcome, commander</h2>
+        <a href="/lgt" class="btn btn-primary">Logout</a>
+    {% else %}
+        <form method="POST" action="">
+            <div class="form-group mb-1">
+                <label>Authenticate</label>
+                <input type="password" class="form-control" name="authcode" value="{{request.form.authcode}}">
+            </div>
+            <p>
+                <input class="btn btn-primary" type="submit" value="Submit"/>
+            </p>
+        </form>
+    {% endif %}
+
+{% endblock %}
