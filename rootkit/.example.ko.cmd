@@ -1,0 +1,1 @@
+cmd_/home/seal/github/private/590j/rootkit/example.ko := ld -r  -m elf_x86_64  --build-id=sha1  -T scripts/module.lds -o /home/seal/github/private/590j/rootkit/example.ko /home/seal/github/private/590j/rootkit/example.o /home/seal/github/private/590j/rootkit/example.mod.o;  true

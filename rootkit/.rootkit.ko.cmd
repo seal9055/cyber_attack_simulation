@@ -1,0 +1,1 @@
+cmd_/home/seal/github/cyber_attack_simulation/rootkit/rootkit.ko := ld -r -m elf_x86_64 --build-id=sha1  -T scripts/module.lds -o /home/seal/github/cyber_attack_simulation/rootkit/rootkit.ko /home/seal/github/cyber_attack_simulation/rootkit/rootkit.o /home/seal/github/cyber_attack_simulation/rootkit/rootkit.mod.o;  true

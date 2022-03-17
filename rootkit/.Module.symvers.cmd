@@ -1,0 +1,1 @@
+cmd_/home/seal/github/cyber_attack_simulation/rootkit/Module.symvers := sed 's/\.ko$$/\.o/' /home/seal/github/cyber_attack_simulation/rootkit/modules.order | scripts/mod/modpost -m -a  -o /home/seal/github/cyber_attack_simulation/rootkit/Module.symvers -e -i Module.symvers   -T -
