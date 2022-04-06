@@ -7,8 +7,8 @@ import time
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import unpad, pad
-from flask import Flask, request, Response, session, render_template, redirect
+from Crypto.Util.Padding import pad, unpad
+from flask import Flask, request, Response, render_template
 from access import *
 
 app = Flask(__name__)
