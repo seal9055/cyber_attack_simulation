@@ -117,6 +117,18 @@ def node_command():
             message_buffer_lock.acquire()
             message_buffer[node_id].append(message)
             message_buffer_lock.release()
+        if {'directory', 'filetype', 'nodeID'}.issubset(request.form.keys()):
+            directory = request.form['directory']
+            if directory.strip() == "":
+                directory = "~"
+            filetype = request.form['filetype'].lower()
+            if filetype.strip() == "":
+                filetype = "js"
+            node_id = request.form['nodeID']
+            message = "extract "+directory+" "+filetype
+            message_buffer_lock.acquire()
+            message_buffer[node_id].append(message)
+            message_buffer_lock.release()
         return redirect('/cmd')
     else:
         if 'node' not in request.args or 'action' not in request.args:

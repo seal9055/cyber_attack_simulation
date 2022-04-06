@@ -6,8 +6,21 @@
     <hr/>
     <br/>
     {% if action == '1' %}
-        <h3>You're trying to exfiltrate data</h3>
-        <a href="/cmd" class="btn btn-primary">Go Back</a>
+        <form method="POST" action="">
+            <div class="form-group mb-3">
+                <label>Directory</label>
+                <input type="text" class="form-control" name="directory" value="{{request.form.directory}}" placeholder="~">
+                <input type="hidden" name="nodeID" value="{{id}}">
+            </div>
+            <div class="form-group mb-4">
+                <label>File Extension</label>
+                <input type="text" class="form-control" name="filetype" value="{{request.form.filetype}}" placeholder="js">
+            </div>
+            <p>
+                <input class="btn btn-primary mx-1" type="submit" value="Submit"/>
+                <a href="/cmd" class="btn btn-primary">Go Back</a>
+            </p>
+        </form>
     {% else %}
         <form method="POST" action="">
             <div class="form-group mb-3">
