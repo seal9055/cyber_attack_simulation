@@ -9,7 +9,7 @@ from Crypto.Util.Padding import pad, unpad
 
 if len(sys.argv) != 2:
     print("USAGE: python3 "+sys.argv[0]+" ENCRYPTION_KEY")
-    exit(1)
+    sys.exit(1)
 
 
 key = bytes.fromhex(sys.argv[1])
