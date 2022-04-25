@@ -19,8 +19,10 @@ app.secret_key = 'f5984jrsd8gjtf549jdsg945fdsgjfgf4w3i243jf-9d9s8gh45f8ref'
 authcode = SHA256.new(b"rosebud").hexdigest()
 
 # Symmetric key for encryption
-key = get_random_bytes(16)
-print(key.hex())
+# key = get_random_bytes(16)
+# print(key.hex())
+
+key = bytes.fromhex("926eaa0640299de816d23463ce8ae883")
 
 # Holds file fragments during exfiltration
 # When the file is completely sent, it is removed from here and reconstructed
