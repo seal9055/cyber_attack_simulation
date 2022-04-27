@@ -1,0 +1,8 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/rohan/Documents/crypter'
+rm -f bin/crypter bin/stub.o bin/stub.bin
+as stub.S -o bin/stub.o
+objcopy -O binary -j .text bin/stub.o bin/stub.bin
+gcc *.c -o bin/crypter -Wall -Werror
+make: Leaving directory '/home/rohan/Documents/crypter'
+ 
