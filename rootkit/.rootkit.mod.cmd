@@ -1,1 +1,0 @@
-cmd_/home/seal/github/cyber_attack_simulation/rootkit/rootkit.mod := { echo  /home/seal/github/cyber_attack_simulation/rootkit/rootkit.o;  echo; } > /home/seal/github/cyber_attack_simulation/rootkit/rootkit.mod
