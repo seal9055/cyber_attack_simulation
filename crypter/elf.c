@@ -13,7 +13,7 @@ int validate_elf(void* file_buffer) {
     return 0;    
 }
 
-int get_decryptor_stub(int file_size, uint64_t image_base, void** decryptor_stub, long* decryptor_stub_size) {
+int get_decryptor_stub(int file_size, uint64_t image_base, void** decryptor_stub, long* decryptor_stub_size, uint64_t* key) {
     // read assembled decryptor stub from disk
     void* file_buffer;
     long bytes_read;
@@ -24,6 +24,11 @@ int get_decryptor_stub(int file_size, uint64_t image_base, void** decryptor_stub
 
     uint64_t entry_point = image_base + sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr);
 
+    uint8_t* keygen_buffer;
+    size_t keygen_size;
+    build_keygen(&keygen_buffer, &keygen_size, key);
+    printf("RC4 Decryption Key: 0x%lx\n", *key);
+
     // replace dynamic values, there's probably a better way to do this
     for (long i = 0; i < bytes_read; i++) {
         long* val = (long*)((char*)file_buffer + i);
@@ -31,11 +36,11 @@ int get_decryptor_stub(int file_size, uint64_t image_base, void** decryptor_stub
         switch (*val) {
             case 0xAAAAAAAAAAAAAAAA:
                 //name of created file descriptor
-                *val = entry_point + bytes_read;
+                *val = entry_point + bytes_read + keygen_size - 3;
                 break;
             case 0xBBBBBBBBBBBBBBBB:
                 // offset to encrypted file buffer
-                *val = entry_point + bytes_read + sizeof(MEMFD_NAME) + 1; 
+                *val = entry_point + bytes_read + keygen_size - 3 + sizeof(MEMFD_NAME) + 1; 
                 break;
             case 0xCCCCCCCCCCCCCCCC:
                 // size of encrypted file
@@ -43,19 +48,20 @@ int get_decryptor_stub(int file_size, uint64_t image_base, void** decryptor_stub
                 break;
             case 0xDDDDDDDDDDDDDDDD:
                 // offset to null string
-                *val = entry_point + bytes_read + sizeof(MEMFD_NAME);
+                *val = entry_point + bytes_read + keygen_size - 3 + sizeof(MEMFD_NAME);
                 break;
         }
     }
-    
+
     // allocate new memory for stub that includes the required strings
-    *decryptor_stub = calloc(bytes_read + sizeof(MEMFD_NAME) + 1, 1); 
+    *decryptor_stub = calloc(bytes_read + sizeof(MEMFD_NAME) + 1 + (keygen_size - 3), 1); 
     memcpy(*decryptor_stub, file_buffer, bytes_read);
-    memcpy((char*)(*decryptor_stub) + bytes_read, MEMFD_NAME, sizeof(MEMFD_NAME));
+    memcpy((char*)(*decryptor_stub) + bytes_read - 3, keygen_buffer, keygen_size);
+    memcpy((char*)(*decryptor_stub) + bytes_read + keygen_size - 3, MEMFD_NAME, sizeof(MEMFD_NAME));
     free(file_buffer);
 
     // set the size of the stub
-    *decryptor_stub_size = bytes_read + sizeof(MEMFD_NAME) + 1;
+    *decryptor_stub_size = bytes_read - 3 + keygen_size + sizeof(MEMFD_NAME) + 1;
     return 0;
 }
 
@@ -98,13 +104,15 @@ int generate_decryptor(void* file_buffer, long file_size, void** decryptor_buffe
     // generates a stub to decrypt the input file
     void* decryptor_stub_buffer;
     long decryptor_stub_size;
-    if (get_decryptor_stub(file_size, 0x400000, &decryptor_stub_buffer, &decryptor_stub_size)) {
+    uint64_t key;
+    if (get_decryptor_stub(file_size, 0x400000, &decryptor_stub_buffer, &decryptor_stub_size, &key)) {
         printf("Failured to generate decryptor stub\n");
         return 1;
     }
 
     // encrypts the input file
-    crypt_rc4(file_buffer, file_size, 0x1234567812345678);
+    crypt_rc4(file_buffer, file_size, key);
+
 
     // build headers for small elf file that contains the stub
     Elf64_Ehdr elf_header;

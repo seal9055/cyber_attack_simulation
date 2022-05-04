@@ -1,3 +1,5 @@
+#include <sys/stat.h>
+
 #include "file.h"
 #include "elf.h"
 
@@ -31,7 +33,12 @@ int main(int argc, char* argv[]) {
 
     // write the file to disk
     if (write_file(argv[2], decryptor_buffer, decryptor_size)) {
-        printf("Unable to write crypted executable to disk\n");
+        printf("Unable to write crypted executable to disk (%s)\n", argv[2]);
+        return 1;
+    }
+
+    if (chmod(argv[2], S_IXUSR)) {
+        printf("Unable to chmod generated executable %s with permissions S_IXUSR\n", argv[2]);
         return 1;
     }
 

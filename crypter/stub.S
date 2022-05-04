@@ -95,8 +95,9 @@ _PRGA_end:
 
 
 # The following code was based off of https://gist.github.com/rverton/a44fc8ca67ab9ec32089
-
 _KSA:
+
+    call _generate_key
     xor %rdx, %rdx
 _init_key:
     cmp %rdx, %rsi
@@ -107,7 +108,6 @@ _init_key:
 _scramble_key_start:
     xor %rdx, %rdx # i
     xor %rcx, %rcx # j
-    mov $0x1234567812345678, %rax # key
 _scramble_key_loop:
     cmp %rdx, %rsi
     je _scramble_key_end
@@ -146,3 +146,8 @@ _scramble_key_loop:
 _scramble_key_end:
     ret
 
+_generate_key:
+    nop
+    nop
+    nop
+    

@@ -8,6 +8,7 @@
 
 #include "file.h"
 #include "rc4.h"
+#include "keygen.h"
 
 // path of decryptor stub, assembled in make file
 #define STUB_BINARY "stub.bin"
@@ -30,9 +31,10 @@ int validate_elf(void* file_buffer);
  * @param image_base image base of ELF that we are generating
  * @param decryptor_stub used to output the newly allocated/created decryptor stub
  * @param decryptor_stub_size used to output the size of the decryptor stub
+ * @param key pointer to key used to encrypt buffer
  * @return int status code (0 for success, 1 for fail)
  */
-int get_decryptor_stub(int file_size, uint64_t image_base, void** decryptor_stub, long* decryptor_stub_size);
+int get_decryptor_stub(int file_size, uint64_t image_base, void** decryptor_stub, long* decryptor_stub_size, uint64_t* key);
 
 /**
  * @brief Fills in the required values for the ELF64 header
