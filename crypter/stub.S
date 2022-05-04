@@ -12,14 +12,38 @@ _start:
 
     call _PRGA # encrypt buffer with RC4
 
-    mov $0xAAAAAAAAAAAAAAAA, %rdi # address of name of fd to create
-    xor %rsi, %rsi
-    mov $319, %rax # memfd_create syscall
+    # CREATES ANONYMOUS FILE DESCRIPTOR
+    # mov $0xAAAAAAAAAAAAAAAA, %rdi # address of name of fd to create
+    # xor %rsi, %rsi
+    # mov $319, %rax # memfd_create syscall
+    # syscall
+    # mov %rax, %r12
+    # cmp $0xFFFFFFFFFFFFFFFF, %rax # exit if error
+    # mov $3, %rdi 
+    # je _exit
+
+    # write to disk instead
+    mov $0x6e, %rsi
+    push %rsi
+    mov $0x69622e64656b6361, %rsi
+    push %rsi
+    mov $0x706e752f706d742f, %rsi
+    push %rsi
+    mov %rsp, %rdi
+    mov $448, %rsi # S_IRWXU
+    mov $85, %rax # creat syscall
     syscall
+    pop %rcx
+    pop %rcx
     mov %rax, %r12
     cmp $0xFFFFFFFFFFFFFFFF, %rax # exit if error
     mov $3, %rdi 
-    je _exit
+    je _cleanup
+
+    mov %r12, %rdi
+    mov $448, %rsi # S_IRWXU
+    mov $91, %rax # chmod syscall 
+    syscall
 
     mov %r12, %rdi
     mov $0xBBBBBBBBBBBBBBBB, %rsi # address of encrypted buffer
@@ -31,13 +55,32 @@ _start:
     mov $4, %rdi
     jne _exit
 
+    # EXEC FROM ANONYMOUS FILE DESCRIPTOR
+    # mov %r12, %rdi
+    # mov $0xDDDDDDDDDDDDDDDD, %rsi # address of empty string
+    # xor %rdx, %rdx
+    # xor %rcx, %rcx
+    # xor %r10, %r10
+    # mov $0x1000, %r8 # AT_EMPTY_PATH
+    # mov $322, %rax # execveat syscall
+    # syscall
+    # mov $5, %rdi
+
     mov %r12, %rdi
-    mov $0xDDDDDDDDDDDDDDDD, %rsi # address of empty string
+    mov $3, %rax # close syscall
+    syscall
+
+
+    mov $0x6e, %rsi
+    push %rsi
+    mov $0x69622e64656b6361, %rsi
+    push %rsi
+    mov $0x706e752f706d742f, %rsi
+    push %rsi
+    mov %rsp, %rdi
+    xor %rsi, %rsi
     xor %rdx, %rdx
-    xor %rcx, %rcx
-    xor %r10, %r10
-    mov $0x1000, %r8 # AT_EMPTY_PATH
-    mov $322, %rax # execveat syscall
+    mov $59, %rax # execve syscall
     syscall
     mov $5, %rdi # exit if error (this line should never be reached)
 
