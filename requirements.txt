@@ -1,6 +1,6 @@
 Flask~=2.0.3
 pycryptodome
 requests
-crontab
+python-crontab
 psutil
 pyinstaller
