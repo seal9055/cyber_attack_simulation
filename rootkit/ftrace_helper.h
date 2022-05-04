@@ -8,6 +8,12 @@
 #include <linux/version.h>
 #include <linux/kprobes.h>
 
+/*
+ * Technique to hook syscalls on modern kernel versions discovered / showcased by @f0lg0 as shown
+ * here: https://github.com/xcellerator/linux_kernel_hacking/issues/3#issue-782815541
+ *
+*/
+
 #define HOOK(x, y, z) { .name = (x), .hooked = (y), .original = (z) }
 
 /// Describes a hook we are trying to add
