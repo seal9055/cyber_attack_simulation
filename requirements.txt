@@ -3,3 +3,4 @@ pycryptodome
 requests
 crontab
 psutil
+pyinstaller
